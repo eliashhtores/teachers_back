@@ -20,12 +20,12 @@ const logConfiguration = {
 const winstonLogger = winston.createLogger(logConfiguration)
 
 // Get one teacher by id
-router.get('/:id', getTeacherByID, async (req, res) => {
+router.get('/:id/:director_id', getTeacherByID, async (req, res) => {
     res.json(res.teacher)
 })
 
 // Get teacher by name
-router.get('/teacher/:name', getTeachersByName, async (req, res) => {
+router.get('/teacher/:name/:director_id', getTeachersByName, async (req, res) => {
     res.json(res.teachers)
 })
 
@@ -89,8 +89,8 @@ router.patch('/:id', async (req, res) => {
 // Middleware functions
 async function getTeacherByID(req, res, next) {
     try {
-        const { id } = req.params
-        const teacher = await pool.query('SELECT * FROM teacher WHERE id = ?', [id])
+        const { id, director_id } = req.params
+        const teacher = await pool.query('SELECT * FROM teacher WHERE id = ? AND director_id = ?', [id, director_id])
         if (teacher[0].length === 0) return res.status(404).json({ message: 'Teacher not found', status: 404 })
 
         res.teacher = teacher[0][0]
@@ -104,8 +104,8 @@ async function getTeacherByID(req, res, next) {
 
 async function getTeachersByName(req, res, next) {
     try {
-        const { name } = req.params
-        const teachers = await pool.query(`SELECT * FROM teacher WHERE name LIKE '%${name}%'`)
+        const { name, director_id } = req.params
+        const teachers = await pool.query(`SELECT * FROM teacher WHERE name LIKE '%${name}%' AND director_id = ?`, [director_id])
         if (teachers[0].length === 0) return res.status(404).json({ message: 'No teachers found', status: 404 })
 
         res.teachers = teachers[0]

@@ -8,7 +8,7 @@ try {
         host: process.env.DATABASE_HOST,
         database: process.env.DATABASE_NAME,
         port: process.env.DATABASE_PORT,
-        // debug: false,
+        // debug: true,
         dateStrings: true,
     })
     console.log(`Connected to database ${process.env.DATABASE_NAME}...`)

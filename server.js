@@ -21,15 +21,15 @@ const logConfiguration = {
 
 const winstonLogger = winston.createLogger(logConfiguration)
 
-// if (process.env.ENV === 'development') {
-//     // Log a message
-//     winstonLogger.log({
-//         // Message to be logged
-//         message: `Process started at ${new Date()}!`,
-//         // Level of the message logging
-//         level: 'info'
-//     })
-// }
+if (process.env.ENV === 'development') {
+    // Log a message
+    winstonLogger.log({
+        // Message to be logged
+        message: `Process started at ${new Date()}!`,
+        // Level of the message logging
+        level: 'info'
+    })
+}
 
 app.use(cors())
 app.use(express.json())

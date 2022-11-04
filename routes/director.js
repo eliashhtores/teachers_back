@@ -25,7 +25,7 @@ router.get('/:id', getDirectorByID, async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { username, name, password } = req.body
-        const newDirector = await pool.query('INSERT INTO director (name, username, password) VALUES (?, ?, PASSWORD(?))', [
+        const newDirector = await pool.query('INSERT INTO director (name, username, password) VALUES (?, ?, MD5(?))', [
             name,
             username,
             password
