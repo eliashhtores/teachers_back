@@ -7,7 +7,9 @@ try {
         password: process.env.DATABASE_PASSWORD,
         host: process.env.DATABASE_HOST,
         database: process.env.DATABASE_NAME,
-        dateStrings: true
+        port: process.env.DATABASE_PORT,
+        // debug: false,
+        dateStrings: true,
     })
     console.log(`Connected to database ${process.env.DATABASE_NAME}...`)
     module.exports = pool
