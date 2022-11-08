@@ -25,12 +25,12 @@ router.get('/:id', getEvaluationByID, async (req, res) => {
 })
 
 // Get evaluations by school cycle
-router.get('/school_cycle/:school_cycle', getEvaluationsBySchoolCycle, async (req, res) => {
+router.get('/school_cycle/:school_cycle/:director_id', getEvaluationsBySchoolCycle, async (req, res) => {
     res.json(res.evaluations)
 })
 
 // Get school cycles
-router.get('/school_cycles/get', getSchoolCycles, async (req, res) => {
+router.get('/school_cycles/get/:director_id', getSchoolCycles, async (req, res) => {
     res.json(res.evaluations)
 })
 
@@ -152,8 +152,8 @@ async function getEvaluationByID(req, res, next) {
 
 async function getEvaluationsBySchoolCycle(req, res, next) {
     try {
-        const { school_cycle } = req.params
-        const evaluations = await pool.query(`SELECT ev.id AS id, name AS teacher_name, created_at FROM evaluation ev JOIN teacher te ON (ev.teacher_id = te.id) WHERE school_cycle = ? ORDER BY created_at ASC`, [school_cycle])
+        const { school_cycle, director_id } = req.params
+        const evaluations = await pool.query(`SELECT ev.id AS id, name AS teacher_name, created_at FROM evaluation ev JOIN teacher te ON (ev.teacher_id = te.id) WHERE school_cycle = ? AND ev.director_id = ? ORDER BY created_at ASC`, [school_cycle, director_id])
         if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
 
         res.evaluations = evaluations[0]
@@ -166,8 +166,9 @@ async function getEvaluationsBySchoolCycle(req, res, next) {
 }
 
 async function getSchoolCycles(req, res, next) {
+    const director_id = req.params.director_id
     try {
-        const evaluations = await pool.query(`SELECT DISTINCT school_cycle FROM evaluation ORDER BY created_at DESC`)
+        const evaluations = await pool.query(`SELECT DISTINCT school_cycle FROM evaluation WHERE director_id = ? ORDER BY created_at DESC`, [director_id])
         if (evaluations[0].length === 0) return res.status(404).json({ message: 'No school cycles found', status: 404 })
 
         res.evaluations = evaluations[0]
