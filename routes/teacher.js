@@ -7,8 +7,6 @@ app.use(express.json())
 
 const winston = require('winston')
 
-app.use(express.json())
-
 const logConfiguration = {
     'transports': [
         new winston.transports.File({
@@ -34,17 +32,16 @@ router.post('/', async (req, res) => {
     try {
         const {
             name,
-            school,
             grade,
             letter,
             director_id,
         } = req.body
 
         const newTeacher = await pool.query(
-            'INSERT INTO teacher (name, school, grade, letter, director_id) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO teacher (name, school, grade, letter, director_id) VALUES (?, (SELECT school FROM director WHERE id = ?), ?, ?, ?)',
             [
                 name,
-                school,
+                director_id,
                 grade,
                 letter,
                 director_id,
@@ -63,16 +60,14 @@ router.patch('/:id', async (req, res) => {
     const { id } = req.params
     const {
         name,
-        school,
         grade,
         letter
     } = req.body
     try {
         const updatedTeacher = await pool.query(
-            'UPDATE teacher SET name = ?, school = ?, grade = ?, letter = ? WHERE id = ?',
+            'UPDATE teacher SET name = ?, grade = ?, letter = ? WHERE id = ?',
             [
                 name,
-                school,
                 grade,
                 letter,
                 id,
