@@ -34,8 +34,13 @@ router.get('/school_cycles/get/:director_id', getSchoolCycles, async (req, res) 
     res.json(res.evaluations)
 })
 
-// Get evaluation by teacher name
+// Get evaluation by teacher id
 router.get('/teacher/:id', getEvaluationsByTeacherID, async (req, res) => {
+    res.json(res.evaluations)
+})
+
+// Check evaluation by current date 
+router.get('/teacher/check/:name/:director_id', checkCurrentDayEvaluation, async (req, res) => {
     res.json(res.evaluations)
 })
 
@@ -183,9 +188,40 @@ async function getSchoolCycles(req, res, next) {
 async function getEvaluationsByTeacherID(req, res, next) {
     try {
         const { id } = req.params
-        const evaluations = await pool.query(`SELECT te.name, ev.id, ev.school_cycle FROM evaluation ev JOIN teacher te ON (te.id = ev.teacher_id) WHERE teacher_id = ? ORDER BY id DESC`, [id])
+        const evaluations = await pool.query('SELECT DISTINCT DATE(ev.created_at) AS created_at, ev.school_cycle, ev.id FROM evaluation ev JOIN teacher te ON (te.id = ev.teacher_id) WHERE teacher_id = ? ORDER BY ev.created_at DESC', [id])
         if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
 
+        res.evaluations = evaluations[0]
+        next()
+    } catch (error) {
+        res.status(500).json({ message: error.message, status: 500 })
+        console.error(error.message)
+        winstonLogger.error(`${error.message} on ${new Date()}`)
+    }
+}
+
+async function checkCurrentDayEvaluation(req, res, next) {
+    try {
+        const { name, director_id } = req.params
+        const evaluations = await pool.query(`
+        WITH last_evaluations AS (
+            SELECT *
+            FROM evaluation
+            WHERE id IN (
+                SELECT MAX(id)
+                FROM evaluation
+                GROUP BY teacher_id
+            )
+        )
+        
+        SELECT te.id, te.name, DATE(last_evaluations.created_at) AS created_at
+        FROM teacher te
+        LEFT JOIN last_evaluations ON (te.id = last_evaluations.teacher_id)
+        WHERE te.director_id = ?
+            AND te.name LIKE '%${name}%'
+        ORDER BY te.name ASC
+        `, [director_id])
+        if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
         res.evaluations = evaluations[0]
         next()
     } catch (error) {

@@ -22,7 +22,7 @@ router.get('/:id/:director_id', getTeacherByID, async (req, res) => {
     res.json(res.teacher)
 })
 
-// Get teacher by name
+// Get teachers by name
 router.get('/teacher/:name/:director_id', getTeachersByName, async (req, res) => {
     res.json(res.teachers)
 })
@@ -85,7 +85,14 @@ router.patch('/:id', async (req, res) => {
 async function getTeacherByID(req, res, next) {
     try {
         const { id, director_id } = req.params
-        const teacher = await pool.query('SELECT * FROM teacher WHERE id = ? AND director_id = ?', [id, director_id])
+        const teacher = await pool.query(`
+        SELECT te.*, ev.total_students FROM teacher te
+        LEFT JOIN evaluation ev ON (ev.teacher_id = te.id)
+        WHERE te.id = ? 
+            AND te.director_id = ?
+        ORDER BY ev.created_at DESC
+        LIMIT 1
+        `, [id, director_id])
         if (teacher[0].length === 0) return res.status(404).json({ message: 'Teacher not found', status: 404 })
 
         res.teacher = teacher[0][0]
