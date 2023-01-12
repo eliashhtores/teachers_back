@@ -1,5 +1,3 @@
-require('dotenv').config()
-
 const express = require('express')
 const app = express()
 
@@ -22,6 +20,7 @@ const logConfiguration = {
 const winstonLogger = winston.createLogger(logConfiguration)
 
 if (process.env.ENV === 'development') {
+    require('dotenv').config()
     // Log a message
     winstonLogger.log({
         // Message to be logged
