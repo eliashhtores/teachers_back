@@ -9,18 +9,18 @@ const teacherRouter = require('./routes/teacher')
 const evaluationRouter = require('./routes/evaluation')
 const activityRouter = require('./routes/activity')
 
-const logConfiguration = {
-    'transports': [
-        new winston.transports.File({
-            filename: 'logs/app.log'
-        })
-    ]
-}
-
-const winstonLogger = winston.createLogger(logConfiguration)
-
 if (process.env.ENV === 'development') {
     require('dotenv').config()
+
+    const logConfiguration = {
+        'transports': [
+            new winston.transports.File({
+                filename: 'logs/app.log'
+            })
+        ]
+    }
+
+    const winstonLogger = winston.createLogger(logConfiguration)
 
     // Log a message
     winstonLogger.log({
