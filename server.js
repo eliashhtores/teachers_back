@@ -17,10 +17,11 @@ const logConfiguration = {
     ]
 }
 
+console.log(`Env = ${process.env.ENV}`)
+
 const winstonLogger = winston.createLogger(logConfiguration)
 
 if (process.env.ENV === 'development') {
-    console.log('test')
     require('dotenv').config()
 
     // Log a message
