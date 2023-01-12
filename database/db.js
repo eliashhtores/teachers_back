@@ -1,7 +1,7 @@
 const mysql = require('mysql2/promise')
-require('dotenv').config()
+console.log(`Env = ${process.env.ENV}`)
 
-console.log(process.env.ENV)
+require('dotenv').config()
 
 try {
     const pool = mysql.createPool({
