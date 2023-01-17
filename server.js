@@ -39,7 +39,7 @@ app.use('/teacher', teacherRouter)
 app.use('/evaluation', evaluationRouter)
 app.use('/activity', activityRouter)
 
-app.listen(process.env.PORT || 3001, () => console.log(`App server running on port ${process.env.PORT}`))
+app.listen(process.env.PORT || 3001, () => console.log(`Server running on port ${process.env.PORT}`))
 
 // Error handler
 app.use(function (err, req, res, next) {
