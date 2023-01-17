@@ -204,21 +204,12 @@ async function checkCurrentDayEvaluation(req, res, next) {
     try {
         const { name, director_id } = req.params
         const evaluations = await pool.query(`
-        WITH last_evaluations AS (
-            SELECT *
-            FROM evaluation
-            WHERE id IN (
-                SELECT MAX(id)
-                FROM evaluation
-                GROUP BY teacher_id
-            )
-        )
-        
-        SELECT te.id, te.name, DATE(last_evaluations.created_at) AS created_at
-        FROM teacher te
-        LEFT JOIN last_evaluations ON (te.id = last_evaluations.teacher_id)
+        SELECT te.id, te.name, DATE(MAX(ev.created_at)) AS created_at
+        FROM teacher te 
+        LEFT JOIN evaluation ev ON (te.director_id = ev.director_id AND ev.teacher_id = te.id) 
         WHERE te.director_id = ?
             AND te.name LIKE '%${name}%'
+        GROUP BY te.id
         ORDER BY te.name ASC
         `, [director_id])
         if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
