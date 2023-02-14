@@ -44,6 +44,16 @@ router.get('/teacher/check/:name/:director_id', checkCurrentDayEvaluation, async
     res.json(res.evaluations)
 })
 
+// Get evaluations by date and teacher name
+router.get('/teacher/:name/:date/:director_id', getEvaluationsByDateAndName, async (req, res) => {
+    res.json(res.evaluations)
+})
+
+// Get evaluation data for charting purposes
+router.get('/:teacher_id/:chart/:date/:director_id', getEvaluationData, async (req, res) => {
+    res.json(res.evaluations)
+})
+
 // Create evaluation
 router.post('/', async (req, res) => {
     try {
@@ -59,23 +69,19 @@ router.post('/', async (req, res) => {
             visit_type,
             description,
             recommendations,
-            students_involved,
-            students_role,
-            prior_knowledge,
-            prior_knowledge_form,
-            situated_learning,
-            activities,
-            material,
-            material_type,
+            start_time_dead,
+            end_time_dead,
+            docent_activity,
             dead_time,
             congruent,
             promotes_situated_learning,
             feedback,
             director_id,
+            activities,
         } = req.body
 
         const newEvaluation = await pool.query(
-            'INSERT INTO evaluation (school_cycle, teacher_id, current_grade, current_letter, created_at, total_students, attendance, institution_organization, visit_type, description, recommendations, students_involved, students_role, prior_knowledge, prior_knowledge_form, situated_learning, material, material_type, dead_time, congruent, promotes_situated_learning, feedback, director_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO evaluation (school_cycle, teacher_id, current_grade, current_letter, created_at, total_students, attendance, institution_organization, visit_type, description, recommendations, start_time_dead, end_time_dead, docent_activity, dead_time, congruent, promotes_situated_learning, feedback, director_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 school_cycle,
                 teacher_id,
@@ -88,13 +94,9 @@ router.post('/', async (req, res) => {
                 visit_type,
                 description,
                 recommendations,
-                students_involved,
-                students_role,
-                prior_knowledge,
-                prior_knowledge_form,
-                situated_learning,
-                material,
-                material_type,
+                start_time_dead,
+                end_time_dead,
+                docent_activity,
                 dead_time,
                 congruent,
                 promotes_situated_learning,
@@ -102,7 +104,7 @@ router.post('/', async (req, res) => {
                 director_id,
             ]
         )
-        createActivity(activities, newEvaluation[0].insertId)
+        createActivities(activities, newEvaluation[0].insertId)
         res.status(201).json(newEvaluation)
     } catch (error) {
         res.status(500).json({ message: error.message })
@@ -222,20 +224,185 @@ async function checkCurrentDayEvaluation(req, res, next) {
     }
 }
 
-async function createActivity(activities, evaluation_id) {
+async function getEvaluationsByDateAndName(req, res, next) {
+    try {
+        const { name, date, director_id } = req.params
+        const evaluations = await pool.query(`
+        SELECT te.id, te.name, DATE(MAX(ev.created_at)) AS created_at
+        FROM teacher te 
+        LEFT JOIN evaluation ev ON (te.director_id = ev.director_id AND ev.teacher_id = te.id) 
+        WHERE te.director_id = ?
+            AND te.name LIKE '%${name}%'
+            AND DATE(created_at) = ?
+        GROUP BY te.id
+        ORDER BY te.name ASC
+        `, [director_id, date])
+        if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
+        res.evaluations = evaluations[0]
+        next()
+    } catch (error) {
+        res.status(500).json({ message: error.message, status: 500 })
+        console.error(error.message)
+        winstonLogger.error(`${error.message} on ${new Date()}`)
+    }
+}
+
+async function getEvaluationData(req, res, next) {
+    try {
+        const { teacher_id, chart, date, director_id } = req.params
+        let query = `
+        SELECT start_time_dead, end_time_dead
+            FROM teacher te 
+            LEFT JOIN evaluation ev ON (te.director_id = ev.director_id AND ev.teacher_id = te.id) 
+            WHERE te.id = ?
+                AND DATE(created_at) = ?
+                AND te.director_id = ?
+            GROUP BY te.id
+            ORDER BY te.name ASC
+        `
+        if (chart === 'students') {
+            query = `
+            SELECT
+                COUNT(students_involved) AS 'total',
+                COALESCE(SUM(students_involved = 'Todos'), 0) AS 'all',
+                COALESCE(SUM(students_involved = 'Más de la mitad'), 0) AS 'more_than_half',
+                COALESCE(SUM(students_involved = 'La mitad'), 0) AS 'half',
+                COALESCE(SUM(students_involved = 'Menos de la mitad'), 0) AS 'less_than_half',
+                COALESCE(SUM(students_involved = 'Ninguno'), 0) AS 'none'
+                FROM activity ac 
+                JOIN evaluation ev ON (ev.id = ac.evaluation_id)
+                WHERE teacher_id = ?
+                    AND DATE(ev.created_at) = ?
+                    AND ev.director_id = ?
+            `
+        } else if (chart === 'material') {
+            query = `
+            SELECT
+                COUNT(mt.material) AS 'total', 
+                COALESCE(SUM(mt.material = 'Permanente de trabajo'), 0) AS 'permanent',
+                COALESCE(SUM(mt.material = 'Informativo'), 0) AS 'informative',
+                COALESCE(SUM(mt.material = 'Ilustrativo'), 0) AS 'illustrative',
+                COALESCE(SUM(mt.material = 'Audiovisual'), 0) AS 'audiovisual',
+                COALESCE(SUM(mt.material = 'Experimental'), 0) AS 'experimental',
+                COALESCE(SUM(mt.material = 'Tecnológico'), 0) AS 'technological'
+                FROM material_type mt
+                LEFT JOIN activity ac ON (ac.id = mt.activity_id)
+                LEFT JOIN evaluation ev ON (ev.id = ac.evaluation_id)
+                WHERE ev.teacher_id = ?
+                AND DATE(ev.created_at) = ?
+                AND ev.director_id = ?
+            `
+        }
+
+        const evaluations = await pool.query(query, [teacher_id, date, director_id])
+        if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
+        res.evaluations = evaluations[0]
+        next()
+    } catch (error) {
+        res.status(500).json({ message: error.message, status: 500 })
+        console.error(error.message)
+        winstonLogger.error(`${error.message} on ${new Date()}`)
+    }
+}
+
+async function createActivities(activities, evaluation_id) {
     for (const activity of activities) {
         if (activity == undefined)
             continue
 
         const {
-            activity_name, start_time, linked_fields, specific_kid, group_learning, end_date, pemc, social_emotional_work,
+            activity_name,
+            start_time,
+            linked_fields,
+            end_time,
+            pemc,
+            social_emotional_work,
+            students_involved,
+            students_role,
+            prior_knowledge,
+            material,
+            material_type,
+            reasonable_adjustments,
         } = activity
 
         try {
-            await pool.query('INSERT INTO activity (activity_name, start_time, linked_fields, specific_kid, group_learning, end_date, pemc, social_emotional_work, evaluation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [activity_name, start_time, linked_fields, specific_kid, group_learning, end_date, pemc, social_emotional_work, evaluation_id])
+            const newActivity = await pool.query('INSERT INTO activity (activity_name, start_time, end_time, pemc, social_emotional_work, students_involved, students_role, prior_knowledge, material, evaluation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    activity_name,
+                    start_time,
+                    end_time,
+                    pemc,
+                    social_emotional_work,
+                    students_involved,
+                    students_role,
+                    prior_knowledge,
+                    material,
+                    evaluation_id,
+                ]
+            )
+            createLinkedFields(linked_fields, newActivity[0].insertId)
+
+            if (reasonable_adjustments.length !== 0)
+                createReasonableAdjustments(reasonable_adjustments, newActivity[0].insertId)
+
+            if (material === 'Con material')
+                createMaterials(material_type, newActivity[0].insertId)
         } catch (error) {
             console.error(error.message)
         }
+    }
+}
+
+async function createLinkedFields(linked_fields, activity_id) {
+    const linkedFieldsArray = linked_fields.split("\n")
+
+    linkedFieldsArray.forEach(async function (field) {
+        try {
+            await pool.query('INSERT INTO linked_field (field, activity_id) VALUES (?, ?)',
+                [
+                    field,
+                    activity_id,
+                ]
+            )
+        } catch (error) {
+            console.error(error.message)
+        }
+    })
+}
+
+async function createMaterials(material_types, activity_id) {
+    const materialsArray = material_types.split("\n")
+
+    materialsArray.forEach(async function (material) {
+        try {
+            await pool.query('INSERT INTO material_type (material, activity_id) VALUES (?, ?)',
+                [
+                    material,
+                    activity_id,
+                ]
+            )
+        } catch (error) {
+            console.error(error.message)
+        }
+    })
+}
+
+async function createReasonableAdjustments(reasonable_adjustments, activity_id) {
+    const reasonableAdjustmentsArray = reasonable_adjustments.split("\n")
+
+    for (let i = 0; i < reasonableAdjustmentsArray.length; i++) {
+        try {
+            await pool.query('INSERT INTO reasonable_adjustment (kid, adjustment, activity_id) VALUES (?, ?, ?)',
+                [
+                    reasonableAdjustmentsArray[i],
+                    reasonableAdjustmentsArray[i + 1],
+                    activity_id,
+                ]
+            )
+        } catch (error) {
+            console.error(error.message)
+        }
+        i++
     }
 }
 

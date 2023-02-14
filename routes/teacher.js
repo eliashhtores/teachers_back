@@ -107,7 +107,12 @@ async function getTeacherByID(req, res, next) {
 async function getTeachersByName(req, res, next) {
     try {
         const { name, director_id } = req.params
-        const teachers = await pool.query(`SELECT * FROM teacher WHERE name LIKE '%${name}%' AND director_id = ?`, [director_id])
+        let query = `SELECT * FROM teacher WHERE name LIKE '%${name}%' AND director_id = ?`
+
+        if (name === 'allTeachers')
+            query = `SELECT * FROM teacher WHERE director_id = ?`
+
+        const teachers = await pool.query(`${query}`, [director_id])
         if (teachers[0].length === 0) return res.status(404).json({ message: 'No teachers found', status: 404 })
 
         res.teachers = teachers[0]
