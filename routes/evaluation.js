@@ -49,8 +49,13 @@ router.get('/teacher/:name/:date/:director_id', getEvaluationsByDateAndName, asy
     res.json(res.evaluations)
 })
 
-// Get evaluation data for charting purposes
+// Get evaluation data for teacher charting purposes
 router.get('/:teacher_id/:chart/:date/:director_id', getEvaluationData, async (req, res) => {
+    res.json(res.evaluations)
+})
+
+// Get evaluation data for teacher charting purposes
+router.get('/:chart/:school_cycle/:director_id', getGlobalEvaluationData, async (req, res) => {
     res.json(res.evaluations)
 })
 
@@ -251,50 +256,113 @@ async function getEvaluationData(req, res, next) {
     try {
         const { teacher_id, chart, date, director_id } = req.params
         let query = `
-        SELECT start_time_dead, end_time_dead
-            FROM teacher te 
-            LEFT JOIN evaluation ev ON (te.director_id = ev.director_id AND ev.teacher_id = te.id) 
-            WHERE te.id = ?
-                AND DATE(created_at) = ?
-                AND te.director_id = ?
-            GROUP BY te.id
-            ORDER BY te.name ASC
-        `
+            SELECT start_time_dead, end_time_dead
+                FROM teacher te 
+                LEFT JOIN evaluation ev ON (te.director_id = ev.director_id AND ev.teacher_id = te.id) 
+                WHERE te.id = ?
+                    AND DATE(created_at) = ?
+                    AND te.director_id = ?
+                GROUP BY te.id
+                ORDER BY te.name ASC
+            `
         if (chart === 'students') {
             query = `
-            SELECT
-                COUNT(students_involved) AS 'total',
-                COALESCE(SUM(students_involved = 'Todos'), 0) AS 'all',
-                COALESCE(SUM(students_involved = 'Más de la mitad'), 0) AS 'more_than_half',
-                COALESCE(SUM(students_involved = 'La mitad'), 0) AS 'half',
-                COALESCE(SUM(students_involved = 'Menos de la mitad'), 0) AS 'less_than_half',
-                COALESCE(SUM(students_involved = 'Ninguno'), 0) AS 'none'
-                FROM activity ac 
-                JOIN evaluation ev ON (ev.id = ac.evaluation_id)
-                WHERE teacher_id = ?
-                    AND DATE(ev.created_at) = ?
-                    AND ev.director_id = ?
-            `
+                SELECT
+                    COUNT(students_involved) AS 'total',
+                    COALESCE(SUM(students_involved = 'Todos'), 0) AS 'all',
+                    COALESCE(SUM(students_involved = 'Más de la mitad'), 0) AS 'more_than_half',
+                    COALESCE(SUM(students_involved = 'La mitad'), 0) AS 'half',
+                    COALESCE(SUM(students_involved = 'Menos de la mitad'), 0) AS 'less_than_half',
+                    COALESCE(SUM(students_involved = 'Ninguno'), 0) AS 'none'
+                    FROM activity ac 
+                    JOIN evaluation ev ON (ev.id = ac.evaluation_id)
+                    WHERE teacher_id = ?
+                        AND DATE(ev.created_at) = ?
+                        AND ev.director_id = ?
+                `
         } else if (chart === 'material') {
             query = `
-            SELECT
-                COUNT(mt.material) AS 'total', 
-                COALESCE(SUM(mt.material = 'Permanente de trabajo'), 0) AS 'permanent',
-                COALESCE(SUM(mt.material = 'Informativo'), 0) AS 'informative',
-                COALESCE(SUM(mt.material = 'Ilustrativo'), 0) AS 'illustrative',
-                COALESCE(SUM(mt.material = 'Audiovisual'), 0) AS 'audiovisual',
-                COALESCE(SUM(mt.material = 'Experimental'), 0) AS 'experimental',
-                COALESCE(SUM(mt.material = 'Tecnológico'), 0) AS 'technological'
-                FROM material_type mt
-                LEFT JOIN activity ac ON (ac.id = mt.activity_id)
-                LEFT JOIN evaluation ev ON (ev.id = ac.evaluation_id)
-                WHERE ev.teacher_id = ?
-                AND DATE(ev.created_at) = ?
-                AND ev.director_id = ?
-            `
+                SELECT
+                    COUNT(mt.material) AS 'total', 
+                    COALESCE(SUM(mt.material = 'Permanente de trabajo'), 0) AS 'permanent',
+                    COALESCE(SUM(mt.material = 'Informativo'), 0) AS 'informative',
+                    COALESCE(SUM(mt.material = 'Ilustrativo'), 0) AS 'illustrative',
+                    COALESCE(SUM(mt.material = 'Audiovisual'), 0) AS 'audiovisual',
+                    COALESCE(SUM(mt.material = 'Experimental'), 0) AS 'experimental',
+                    COALESCE(SUM(mt.material = 'Tecnológico'), 0) AS 'technological'
+                    FROM material_type mt
+                    LEFT JOIN activity ac ON (ac.id = mt.activity_id)
+                    LEFT JOIN evaluation ev ON (ev.id = ac.evaluation_id)
+                    WHERE ev.teacher_id = ?
+                    AND DATE(ev.created_at) = ?
+                    AND ev.director_id = ?
+                `
         }
-
         const evaluations = await pool.query(query, [teacher_id, date, director_id])
+        if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
+        res.evaluations = evaluations[0]
+        next()
+    } catch (error) {
+        res.status(500).json({ message: error.message, status: 500 })
+        console.error(error.message)
+        winstonLogger.error(`${error.message} on ${new Date()}`)
+    }
+}
+
+async function getGlobalEvaluationData(req, res, next) {
+    try {
+        const { chart, school_cycle, director_id } = req.params
+        let query = `
+        SELECT dead_time, COUNT(*) AS count
+            FROM evaluation 
+            WHERE school_cycle = ?
+                AND director_id = ?
+            GROUP BY dead_time
+            ORDER BY dead_time DESC
+        `
+        if (chart === 'global_students') {
+            query = `
+                SELECT
+                    COUNT(students_involved) AS 'total',
+                    COALESCE(SUM(students_involved = 'Todos'), 0) AS 'all',
+                    COALESCE(SUM(students_involved = 'Más de la mitad'), 0) AS 'more_than_half',
+                    COALESCE(SUM(students_involved = 'La mitad'), 0) AS 'half',
+                    COALESCE(SUM(students_involved = 'Menos de la mitad'), 0) AS 'less_than_half',
+                    COALESCE(SUM(students_involved = 'Ninguno'), 0) AS 'none'
+                    FROM activity ac 
+                    JOIN evaluation ev ON (ev.id = ac.evaluation_id)
+                    WHERE school_cycle = ?
+                        AND director_id = ?
+        `
+        } else if (chart === 'global_material') {
+            query = `
+                SELECT
+                    COUNT(mt.material) AS 'total', 
+                    COALESCE(SUM(mt.material = 'Permanente de trabajo'), 0) AS 'permanent',
+                    COALESCE(SUM(mt.material = 'Informativo'), 0) AS 'informative',
+                    COALESCE(SUM(mt.material = 'Ilustrativo'), 0) AS 'illustrative',
+                    COALESCE(SUM(mt.material = 'Audiovisual'), 0) AS 'audiovisual',
+                    COALESCE(SUM(mt.material = 'Experimental'), 0) AS 'experimental',
+                    COALESCE(SUM(mt.material = 'Tecnológico'), 0) AS 'technological'
+                    FROM material_type mt
+                    LEFT JOIN activity ac ON (ac.id = mt.activity_id)
+                    LEFT JOIN evaluation ev ON (ev.id = ac.evaluation_id)
+                    WHERE school_cycle = ?
+                        AND director_id = ?
+                `
+        } else if (chart === 'pemc') {
+            query = `
+                SELECT
+                COUNT(students_involved) AS 'total',
+                COALESCE(SUM(pemc = 'Sí'), 0) AS 'yes',
+                COALESCE(SUM(pemc = 'No'), 0) AS 'no'
+                FROM activity ac 
+                JOIN evaluation ev ON (ev.id = ac.evaluation_id)
+                WHERE school_cycle = ?
+                    AND director_id = ?
+                `
+        }
+        const evaluations = await pool.query(query, [school_cycle, director_id])
         if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
         res.evaluations = evaluations[0]
         next()
