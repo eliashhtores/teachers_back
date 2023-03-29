@@ -49,6 +49,11 @@ router.get('/teacher/:name/:date/:director_id', getEvaluationsByDateAndName, asy
     res.json(res.evaluations)
 })
 
+// Get dead times by evaluation id
+router.get('/dead_time/:id', getDeadTimes, async (req, res) => {
+    res.json(res.deadTimes)
+})
+
 // Get evaluation data for teacher charting purposes
 router.get('/:teacher_id/:chart/:date/:director_id', getEvaluationData, async (req, res) => {
     res.json(res.evaluations)
@@ -72,21 +77,16 @@ router.post('/', async (req, res) => {
             attendance,
             institution_organization,
             visit_type,
-            description,
-            recommendations,
-            start_time_dead,
-            end_time_dead,
-            docent_activity,
-            dead_time,
             congruent,
             promotes_situated_learning,
             feedback,
             director_id,
             activities,
+            deadTimes,
         } = req.body
 
         const newEvaluation = await pool.query(
-            'INSERT INTO evaluation (school_cycle, teacher_id, current_grade, current_letter, created_at, total_students, attendance, institution_organization, visit_type, description, recommendations, start_time_dead, end_time_dead, docent_activity, dead_time, congruent, promotes_situated_learning, feedback, director_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO evaluation (school_cycle, teacher_id, current_grade, current_letter, created_at, total_students, attendance, institution_organization, visit_type, congruent, promotes_situated_learning, feedback, director_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 school_cycle,
                 teacher_id,
@@ -97,12 +97,6 @@ router.post('/', async (req, res) => {
                 attendance,
                 institution_organization,
                 visit_type,
-                description,
-                recommendations,
-                start_time_dead,
-                end_time_dead,
-                docent_activity,
-                dead_time,
                 congruent,
                 promotes_situated_learning,
                 feedback,
@@ -110,6 +104,7 @@ router.post('/', async (req, res) => {
             ]
         )
         createActivities(activities, newEvaluation[0].insertId)
+        createDeadTimes(deadTimes, newEvaluation[0].insertId)
         res.status(201).json(newEvaluation)
     } catch (error) {
         res.status(500).json({ message: error.message })
@@ -154,6 +149,36 @@ async function getEvaluationByID(req, res, next) {
         if (evaluation[0].length === 0) return res.status(404).json({ message: 'Evaluation not found', status: 404 })
 
         res.evaluation = evaluation[0][0]
+        next()
+    } catch (error) {
+        res.status(500).json({ message: error.message, status: 500 })
+        console.error(error.message)
+        winstonLogger.error(`${error.message} on ${new Date()}`)
+    }
+}
+
+async function getEvaluationsBySchoolCycle(req, res, next) {
+    try {
+        const { school_cycle, director_id } = req.params
+        const evaluations = await pool.query(`SELECT ev.id AS id, name AS teacher_name, created_at FROM evaluation ev JOIN teacher te ON (ev.teacher_id = te.id) WHERE school_cycle = ? AND ev.director_id = ? ORDER BY created_at ASC`, [school_cycle, director_id])
+        if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
+
+        res.evaluations = evaluations[0]
+        next()
+    } catch (error) {
+        res.status(500).json({ message: error.message, status: 500 })
+        console.error(error.message)
+        winstonLogger.error(`${error.message} on ${new Date()}`)
+    }
+}
+
+async function getDeadTimes(req, res, next) {
+    try {
+        const { id } = req.params
+        const deadTimes = await pool.query('SELECT * FROM dead_time WHERE evaluation_id = ?', [id])
+        if (deadTimes[0].length === 0) return res.status(404).json({ message: 'No dead times found', status: 404 })
+
+        res.deadTimes = deadTimes[0]
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
@@ -256,14 +281,11 @@ async function getEvaluationData(req, res, next) {
     try {
         const { teacher_id, chart, date, director_id } = req.params
         let query = `
-            SELECT start_time_dead, end_time_dead
-                FROM teacher te 
-                LEFT JOIN evaluation ev ON (te.director_id = ev.director_id AND ev.teacher_id = te.id) 
-                WHERE te.id = ?
+            SELECT TRUNCATE(SUM(TIME_TO_SEC(TIMEDIFF(end, start)) / 60), 0) AS total
+                FROM dead_time dt
+                JOIN evaluation ev ON (ev.id = dt.evaluation_id) 
+                WHERE ev.teacher_id = ?
                     AND DATE(created_at) = ?
-                    AND te.director_id = ?
-                GROUP BY te.id
-                ORDER BY te.name ASC
             `
         if (chart === 'students') {
             query = `
@@ -313,12 +335,13 @@ async function getGlobalEvaluationData(req, res, next) {
     try {
         const { chart, school_cycle, director_id } = req.params
         let query = `
-        SELECT dead_time, COUNT(*) AS count
-            FROM evaluation 
-            WHERE school_cycle = ?
-                AND director_id = ?
-            GROUP BY dead_time
-            ORDER BY dead_time DESC
+        SELECT 
+        (SELECT COUNT(DISTINCT evaluation_id) 
+            FROM dead_time 
+            WHERE evaluation_id IN (SELECT id FROM evaluation 
+                                        WHERE director_id = ? AND school_cycle = ?)) AS count,
+        (SELECT COUNT(*) FROM teacher 
+            WHERE director_id = ?) AS total;
         `
         if (chart === 'global_students') {
             query = `
@@ -362,7 +385,13 @@ async function getGlobalEvaluationData(req, res, next) {
                     AND director_id = ?
                 `
         }
-        const evaluations = await pool.query(query, [school_cycle, director_id])
+
+        let params = [school_cycle, director_id]
+        if (chart === 'global_time')
+            params = [director_id, school_cycle, director_id]
+
+        const evaluations = await pool.query(query, params)
+
         if (evaluations[0].length === 0) return res.status(404).json({ message: 'No evaluations found', status: 404 })
         res.evaluations = evaluations[0]
         next()
@@ -380,6 +409,7 @@ async function createActivities(activities, evaluation_id) {
 
         const {
             activity_name,
+            description,
             start_time,
             linked_fields,
             end_time,
@@ -389,14 +419,16 @@ async function createActivities(activities, evaluation_id) {
             students_role,
             prior_knowledge,
             material,
+            recommendations,
             material_type,
             reasonable_adjustments,
         } = activity
 
         try {
-            const newActivity = await pool.query('INSERT INTO activity (activity_name, start_time, end_time, pemc, social_emotional_work, students_involved, students_role, prior_knowledge, material, evaluation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            const newActivity = await pool.query('INSERT INTO activity (activity_name, description, start_time, end_time, pemc, social_emotional_work, students_involved, students_role, prior_knowledge, material, recommendations, evaluation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     activity_name,
+                    description,
                     start_time,
                     end_time,
                     pemc,
@@ -405,6 +437,7 @@ async function createActivities(activities, evaluation_id) {
                     students_role,
                     prior_knowledge,
                     material,
+                    recommendations,
                     evaluation_id,
                 ]
             )
@@ -415,6 +448,32 @@ async function createActivities(activities, evaluation_id) {
 
             if (material === 'Con material')
                 createMaterials(material_type, newActivity[0].insertId)
+        } catch (error) {
+            console.error(error.message)
+        }
+    }
+}
+
+async function createDeadTimes(deadTimes, evaluation_id) {
+    for (const deadTime of deadTimes) {
+        if (deadTime == undefined)
+            continue
+
+        const {
+            start,
+            end,
+            docent_activity,
+        } = deadTime
+
+        try {
+            await pool.query('INSERT INTO dead_time (start, end, docent_activity, evaluation_id) VALUES (?, ?, ?, ?)',
+                [
+                    start,
+                    end,
+                    docent_activity,
+                    evaluation_id,
+                ]
+            )
         } catch (error) {
             console.error(error.message)
         }
