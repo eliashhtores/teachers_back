@@ -168,7 +168,7 @@ async function getEvaluationsBySchoolCycle(req, res, next) {
 async function getDeadTimes(req, res, next) {
     try {
         const { id } = req.params
-        const deadTimes = await pool.query("SELECT * FROM dead_time WHERE evaluation_id = ?", [id])
+        const deadTimes = await pool.query("SELECT * FROM dead_time WHERE evaluation_id = ? ORDER BY start", [id])
         if (deadTimes[0].length === 0) return res.status(404).json({ message: "No dead times found", status: 404 })
 
         res.deadTimes = deadTimes[0]
