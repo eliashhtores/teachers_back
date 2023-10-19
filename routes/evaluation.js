@@ -202,7 +202,7 @@ async function getSchoolCycles(req, res, next) {
     const director_id = req.params.director_id
     try {
         const evaluations = await pool.query(
-            `SELECT DISTINCT school_cycle FROM evaluation WHERE director_id = ? ORDER BY created_at DESC`,
+            `SELECT DISTINCT school_cycle FROM evaluation WHERE director_id = ? ORDER BY 1 DESC`,
             [director_id]
         )
         if (evaluations[0].length === 0) return res.status(404).json({ message: "No school cycles found", status: 404 })
@@ -220,7 +220,7 @@ async function getEvaluationsByTeacherID(req, res, next) {
     try {
         const { id } = req.params
         const evaluations = await pool.query(
-            "SELECT DISTINCT DATE(ev.created_at) AS created_at, ev.school_cycle, ev.id FROM evaluation ev JOIN teacher te ON (te.id = ev.teacher_id) WHERE teacher_id = ? ORDER BY ev.created_at DESC",
+            "SELECT DISTINCT DATE(ev.created_at) AS created_at, ev.school_cycle, ev.id FROM evaluation ev JOIN teacher te ON (te.id = ev.teacher_id) WHERE teacher_id = ? ORDER BY 1 DESC",
             [id]
         )
         if (evaluations[0].length === 0) return res.status(404).json({ message: "No evaluations found", status: 404 })
