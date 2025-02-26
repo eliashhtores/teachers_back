@@ -5,19 +5,7 @@ const pool = require("../database/db")
 
 app.use(express.json())
 
-const winston = require("winston")
-
 app.use(express.json())
-
-const logConfiguration = {
-    transports: [
-        new winston.transports.File({
-            filename: "logs/app.log",
-        }),
-    ],
-}
-
-const winstonLogger = winston.createLogger(logConfiguration)
 
 // Get one evaluation by id
 router.get("/:id", getEvaluationByID, async (req, res) => {
@@ -106,8 +94,7 @@ router.post("/", async (req, res) => {
         res.status(201).json(newEvaluation)
     } catch (error) {
         res.status(500).json({ message: error.message })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 })
 
@@ -123,8 +110,7 @@ router.patch("/:id", async (req, res) => {
         res.json(updatedEvaluation)
     } catch (error) {
         res.status(500).json({ message: error.message })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 })
 
@@ -142,8 +128,7 @@ async function getEvaluationByID(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -160,8 +145,7 @@ async function getEvaluationsBySchoolCycle(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -175,8 +159,7 @@ async function getDeadTimes(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -193,8 +176,7 @@ async function getEvaluationsBySchoolCycle(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -211,8 +193,7 @@ async function getSchoolCycles(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -229,8 +210,7 @@ async function getEvaluationsByTeacherID(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -254,8 +234,7 @@ async function checkCurrentDayEvaluation(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -280,8 +259,7 @@ async function getEvaluationsByDateAndName(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -334,8 +312,7 @@ async function getEvaluationData(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -404,8 +381,7 @@ async function getGlobalEvaluationData(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 

@@ -5,19 +5,7 @@ const pool = require("../database/db")
 
 app.use(express.json())
 
-const winston = require("winston")
-
 app.use(express.json())
-
-const logConfiguration = {
-    transports: [
-        new winston.transports.File({
-            filename: "logs/app.log",
-        }),
-    ],
-}
-
-const winstonLogger = winston.createLogger(logConfiguration)
 
 // Get one activity by id
 router.get("/:id", getActivityByID, async (req, res) => {
@@ -41,8 +29,7 @@ router.post("/", async (req, res) => {
         res.status(201).json(newActivity)
     } catch (error) {
         res.status(500).json({ message: error.message })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 })
 
@@ -58,8 +45,7 @@ router.patch("/:id", async (req, res) => {
         res.json(updatedActivity)
     } catch (error) {
         res.status(500).json({ message: error.message })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 })
 
@@ -74,8 +60,7 @@ async function getActivityByID(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
@@ -91,8 +76,7 @@ async function getActivitiesByEvaluationID(req, res, next) {
         next()
     } catch (error) {
         res.status(500).json({ message: error.message, status: 500 })
-        console.error(error.message)
-        winstonLogger.error(`${error.message} on ${new Date()}`)
+        console.error(error.message).error(`${error.message} on ${new Date()}`)
     }
 }
 
