@@ -1,5 +1,5 @@
 const mysql = require("mysql2/promise")
-if (process.env.ENV === undefined) require("dotenv").config()
+require("dotenv").config()
 
 let pool
 
